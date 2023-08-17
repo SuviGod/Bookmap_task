@@ -5,18 +5,16 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Optional;
-import java.util.PriorityQueue;
+import java.util.*;
 
 public class ActionsPerformer {
     private final List<String> commands;
 
     private final BufferedWriter writer;
 
-    private PriorityQueue<Integer[]> bidTable;
+    private Map<Integer, Integer> bidTable;
 
-    private PriorityQueue<Integer[]> askTable;
+    private Map<Integer, Integer> askTable;
 
     private int currentCommandNumber = 0;
 
@@ -56,26 +54,10 @@ public class ActionsPerformer {
     }
 
     private void initBidTable() {
-        bidTable = new PriorityQueue<>((raw1, raw2) -> {
-            if(raw1[1] > 0) {
-                if(raw2[1] > 0) {
-                    return -1 * raw1[0].compareTo(raw2[0]);
-                }
-                return raw1[0];
-            }
-            return raw1[0];
-        });
+        bidTable = new HashMap<>();
     }
     private void initAskTable() {
-        askTable = new PriorityQueue<>((raw1, raw2) -> {
-            if(raw1[1] > 0) {
-                if(raw2[1] > 0) {
-                    return raw1[0].compareTo(raw2[0]);
-                }
-                return raw1[0];
-            }
-            return raw1[0];
-        });
+        askTable = new HashMap<>();
     }
 
     public void perform() {
@@ -117,42 +99,30 @@ public class ActionsPerformer {
 
         switch (commandParts.get(2)) {
             case ("bid") -> {
-                Integer [] rawToInsert = findBidByPrice(price)
-                        .orElseGet(() -> new Integer[2]);
-                bidTable.remove(rawToInsert);
-                rawToInsert[0] = price;
-                rawToInsert[1] = size;
-                bidTable.add(rawToInsert);
+                bidTable.put(price, size);
             }
             case ("ask") -> {
-                Integer [] rawToInsert = findAskByPrice(price)
-                        .orElseGet(() -> new Integer[2]);
-                askTable.remove(rawToInsert);
-                rawToInsert[0] = price;
-                rawToInsert[1] = size;
-                askTable.add(rawToInsert);
+                askTable.put(price, size);
             }
             default -> throw new RuntimeException("incorrect input format");
         }
     }
 
-    private Optional<Integer []> findBidByPrice(Integer price) {
-        return bidTable.stream()
-                .filter( raw -> raw[0].equals(price))
-                .findFirst();
+    private Optional<Integer> findBidByPrice(Integer price) {
+        return Optional.ofNullable(
+                bidTable.getOrDefault(price, null));
     }
 
-    private Optional<Integer []> findAskByPrice(Integer price) {
-        return askTable.stream()
-                .filter( raw -> raw[0].equals(price))
-                .findFirst();
+    private Optional<Integer> findAskByPrice(Integer price) {
+        return Optional.ofNullable(
+                askTable.getOrDefault(price, null));
     }
 
     private void performPrint(String command) {
         command = command.substring(2);
         switch (command) {
-            case ("best_bid") -> printBestProposalFromTable(bidTable);
-            case ("best_ask") -> printBestProposalFromTable(askTable);
+            case ("best_bid") -> printBestBid();
+            case ("best_ask") -> printBestAsk();
             default -> printSizeAtPrice(command);
         }
     }
@@ -166,23 +136,9 @@ public class ActionsPerformer {
 
         Integer price = Integer.parseInt(commandParts.get(1));
 
-        Integer askSize = askTable.stream()
-                .filter(raw -> price.equals(raw[0]))
-                .findFirst()
-                .orElseGet(() -> {
-                    Integer [] emptyRaw = new Integer[2];
-                    emptyRaw[1] = 0;
-                    return emptyRaw;
-                })[1];
+        Integer askSize = findAskByPrice(price).orElse(0);
 
-        Integer bidSize = bidTable.stream()
-                .filter(raw -> price.equals(raw[0]))
-                .findFirst()
-                .orElseGet(() -> {
-                    Integer [] emptyRaw = new Integer[2];
-                    emptyRaw[1] = 0;
-                    return emptyRaw;
-                })[1];
+        Integer bidSize = findBidByPrice(price).orElse(0);
         int totalSize = bidSize + askSize;
         try {
             writer.write(Integer.toString(totalSize));
@@ -194,13 +150,23 @@ public class ActionsPerformer {
         }
     }
 
-    private void printBestProposalFromTable(PriorityQueue<Integer []> table) {
-        Integer [] priceAndSize = table.peek();
 
+    private void printBestAsk() {
+        Integer maxPrice = Collections.min(askTable.keySet());
+        printBestProposal(maxPrice, askTable);
+    }
+
+    private void printBestBid() {
+        Integer maxPrice = Collections.max(bidTable.keySet());
+        printBestProposal(maxPrice, bidTable);
+    }
+
+    private void printBestProposal(Integer maxPrice, Map<Integer, Integer> bidTable) {
+        Integer size = bidTable.get(maxPrice);
         try {
-            writer.write(priceAndSize[0].toString());
+            writer.write(maxPrice.toString());
             writer.write(',');
-            writer.write(priceAndSize[1].toString());
+            writer.write(size.toString());
             if(currentCommandNumber != lastPrintOperationNumber) {
                 writer.newLine();
             }
@@ -226,22 +192,37 @@ public class ActionsPerformer {
         }
     }
 
-    private void removeBestAsks(Integer size) {
-        removeBestsFromTable(size, askTable);
+    private void removeBestAsks(Integer sizeToRemove) {
+        List<Integer> sortedPrices = askTable
+                .keySet()
+                .stream()
+                .sorted()
+                .toList();
+        removeBestProposals(sizeToRemove, sortedPrices, askTable);
+
     }
 
-    private void removeBestBids(Integer size) {
-        removeBestsFromTable(size, bidTable);
+    private void removeBestBids(Integer sizeToRemove) {
+        List<Integer> sortedPrices = bidTable
+                .keySet()
+                .stream()
+                .sorted(Comparator.reverseOrder())
+                .toList();
+        removeBestProposals(sizeToRemove, sortedPrices, bidTable);
+
     }
-    private void removeBestsFromTable(Integer size, PriorityQueue<Integer []> table) {
-        for (;size > 0;) {
-            Integer [] raw = table.peek();
-            if (raw[1] > size) {
-                raw[1] -= size;
-                size = 0;
+
+    private void removeBestProposals(Integer sizeToRemove, List<Integer> sortedPrices, Map<Integer, Integer> table) {
+        for (int i = 0;sizeToRemove > 0 && i < sortedPrices.size();i++) {
+            Integer price = sortedPrices.get(i);
+            Integer size = table.get(price);
+            if (size > sizeToRemove) {
+                size -= sizeToRemove;
+                table.put(price, size);
+                sizeToRemove = 0;
             } else {
-                size -= raw[1];
-                table.remove(raw);
+                sizeToRemove -= size;
+                table.remove(price);
             }
         }
     }
