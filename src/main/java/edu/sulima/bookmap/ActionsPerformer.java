@@ -201,39 +201,37 @@ public class ActionsPerformer {
     }
 
     private void removeBestAsks(Integer sizeToRemove) {
-        List<Integer> sortedPrices = askTable
-                .keySet()
-                .stream()
-                .sorted()
-                .toList();
-        removeBestProposals(sizeToRemove, sortedPrices, askTable);
+        for (;sizeToRemove > 0 && !askTable.isEmpty();) {
+            Integer price = askTable.keySet().stream()
+                    .min(Integer::compareTo)
+                    .get();
 
+            sizeToRemove = removeProposal(sizeToRemove, price, askTable);
+        }
     }
 
     private void removeBestBids(Integer sizeToRemove) {
-        List<Integer> sortedPrices = bidTable
-                .keySet()
-                .stream()
-                .sorted(Comparator.reverseOrder())
-                .toList();
+        for (;sizeToRemove > 0 && !bidTable.isEmpty();) {
+            Integer price = bidTable.keySet().stream()
+                    .max(Integer::compareTo)
+                    .get();
 
-        removeBestProposals(sizeToRemove, sortedPrices, bidTable);
+            sizeToRemove = removeProposal(sizeToRemove, price, bidTable);
+        }
 
     }
 
-    private void removeBestProposals(Integer sizeToRemove, List<Integer> sortedPrices, Map<Integer, Integer> table) {
-        for (int i = 0;sizeToRemove > 0 && i < sortedPrices.size();i++) {
-            Integer price = sortedPrices.get(i);
-            Integer size = table.get(price);
-            if (size > sizeToRemove) {
-                size -= sizeToRemove;
-                table.put(price, size);
-                sizeToRemove = 0;
-            } else {
-                sizeToRemove -= size;
-                table.remove(price);
-            }
+    private Integer removeProposal(Integer sizeToRemove, Integer price, Map<Integer, Integer> bidTable) {
+        Integer size = bidTable.get(price);
+        if (size > sizeToRemove) {
+            size -= sizeToRemove;
+            bidTable.put(price, size);
+            sizeToRemove = 0;
+        } else {
+            sizeToRemove -= size;
+            bidTable.remove(price);
         }
+        return sizeToRemove;
     }
 
 
