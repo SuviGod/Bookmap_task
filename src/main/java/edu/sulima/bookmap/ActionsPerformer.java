@@ -7,9 +7,9 @@ public class ActionsPerformer {
 
     private final FileService fileService;
 
-    private Map<Integer, Integer> bidTable;
+    private SortedMap<Integer, Integer> bidTable;
 
-    private Map<Integer, Integer> askTable;
+    private SortedMap<Integer, Integer> askTable;
 
     public ActionsPerformer(String inputFilename, String outputFilename) {
         commands = new LinkedList<>();
@@ -23,10 +23,10 @@ public class ActionsPerformer {
 
 
     private void initBidTable() {
-        bidTable = new HashMap<>();
+        bidTable = new TreeMap<>();
     }
     private void initAskTable() {
-        askTable = new HashMap<>();
+        askTable = new TreeMap<>();
     }
 
     public void perform() {
@@ -121,12 +121,12 @@ public class ActionsPerformer {
 
 
     private void printBestAsk() {
-        Integer maxPrice = Collections.min(askTable.keySet());
+        Integer maxPrice = askTable.firstKey();
         printBestProposal(maxPrice, askTable);
     }
 
     private void printBestBid() {
-        Integer maxPrice = Collections.max(bidTable.keySet());
+        Integer maxPrice = bidTable.lastKey();
         printBestProposal(maxPrice, bidTable);
     }
 
