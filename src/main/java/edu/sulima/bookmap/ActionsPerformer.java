@@ -99,10 +99,18 @@ public class ActionsPerformer {
 
         switch (commandParts.get(2)) {
             case ("bid") -> {
-                bidTable.put(price, size);
+                if(size <=0) {
+                    bidTable.remove(price);
+                } else {
+                    bidTable.put(price, size);
+                }
             }
             case ("ask") -> {
-                askTable.put(price, size);
+                if(size <=0) {
+                    askTable.remove(price);
+                } else {
+                    askTable.put(price, size);
+                }
             }
             default -> throw new RuntimeException("incorrect input format");
         }
@@ -208,6 +216,7 @@ public class ActionsPerformer {
                 .stream()
                 .sorted(Comparator.reverseOrder())
                 .toList();
+
         removeBestProposals(sizeToRemove, sortedPrices, bidTable);
 
     }
