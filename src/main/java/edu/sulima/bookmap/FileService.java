@@ -11,15 +11,8 @@ public class FileService {
 
     private final BufferedWriter writer;
 
-    private final String inputFilename;
-
-    private final String outputFilename;
-
-
 
     public FileService(String inputFilename, String outputFilename) {
-        this.inputFilename = inputFilename;
-        this.outputFilename = outputFilename;
         try {
             reader = Files.newBufferedReader(Path.of(inputFilename));
             Path outputFilePath = Path.of(outputFilename);
