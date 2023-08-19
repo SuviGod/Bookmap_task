@@ -8,50 +8,24 @@ import java.nio.file.Path;
 import java.util.*;
 
 public class ActionsPerformer {
-    private final List<String> commands;
+    private final Queue<String> commands;
 
-    private final BufferedWriter writer;
+    private final FileService fileService;
 
     private Map<Integer, Integer> bidTable;
 
     private Map<Integer, Integer> askTable;
 
-    private int currentCommandNumber = 0;
-
-    private int lastPrintOperationNumber = 0;
-
     public ActionsPerformer(String inputFilename, String outputFilename) {
-        commands = readFile(inputFilename);
+        commands = new LinkedList<>();
 
-        prepareFile(outputFilename);
-
-        writer = getWriter(outputFilename);
+        fileService = new FileService(inputFilename, outputFilename);
 
         initBidTable();
         initAskTable();
 
-        lastPrintOperationNumber = getLastPrintOperationNumber();
     }
 
-    private int getLastPrintOperationNumber() {
-        int last = 0;
-        for(int i = 0; i < commands.size(); i++) {
-            if(commands.get(i).charAt(0) == 'q') {
-                last = i;
-            }
-        }
-        return last + 1;
-    }
-
-    private void prepareFile(String outputFilename) {
-        Path outputFilePath = Path.of(outputFilename);
-        try {
-            Files.deleteIfExists(outputFilePath);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-    }
 
     private void initBidTable() {
         bidTable = new HashMap<>();
@@ -61,8 +35,13 @@ public class ActionsPerformer {
     }
 
     public void perform() {
-        for (String command: commands) {
-            currentCommandNumber++;
+        commands.add(fileService.readLine());
+        for (;!commands.isEmpty();) {
+            Optional<String> maybeNextCommand =
+                    Optional.ofNullable(fileService.readLine());
+            maybeNextCommand.ifPresent(commands::add);
+
+            String command = commands.poll();
             char actionType = command.charAt(0);
 
             switch (actionType) {
@@ -71,21 +50,12 @@ public class ActionsPerformer {
                 case ('o') -> performRemove(command);
                 default -> throw new RuntimeException("Incorrect input format");
             }
+
         }
-        closeWriter();
+        fileService.close();
 
     }
 
-    private void closeWriter() {
-        try {
-
-            if (writer != null) {
-                writer.close();
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     private void performUpdate(String command) {
         command = command.substring(2);
@@ -148,14 +118,10 @@ public class ActionsPerformer {
 
         Integer bidSize = findBidByPrice(price).orElse(0);
         int totalSize = bidSize + askSize;
-        try {
-            writer.write(Integer.toString(totalSize));
-            if(currentCommandNumber != lastPrintOperationNumber) {
-                writer.newLine();
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        boolean appendSpace = !commands.isEmpty();
+
+        fileService.writeLine(Integer.toString(totalSize), appendSpace);
+
     }
 
 
@@ -171,16 +137,13 @@ public class ActionsPerformer {
 
     private void printBestProposal(Integer maxPrice, Map<Integer, Integer> bidTable) {
         Integer size = bidTable.get(maxPrice);
-        try {
-            writer.write(maxPrice.toString());
-            writer.write(',');
-            writer.write(size.toString());
-            if(currentCommandNumber != lastPrintOperationNumber) {
-                writer.newLine();
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        StringBuilder sb = new StringBuilder()
+                .append(maxPrice)
+                .append(',')
+                .append(size);
+        boolean appendSpace = !commands.isEmpty();
+
+        fileService.writeLine(sb.toString(), appendSpace);
     }
 
     private void performRemove(String command) {
@@ -235,24 +198,4 @@ public class ActionsPerformer {
     }
 
 
-    private BufferedWriter getWriter(String outputFilename) {
-        try {
-            return new BufferedWriter(new FileWriter(outputFilename, true));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private List<String> readFile(String inputFilename) {
-
-        Path inputFilePath = Path.of(inputFilename);
-
-        List<String> commands;
-        try {
-            commands = Files.readAllLines(inputFilePath);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return commands;
-    }
 }
